@@ -37,42 +37,34 @@ internal class SOCManager<Content: View, Style: ShapeStyle>: ObservableObject {
         cardController = UIHostingController(rootView: rootCard)
         cardController?.view.backgroundColor = .clear
         cardController?.modalPresentationStyle = .overFullScreen
-        
-        model.$showCard
-            .removeDuplicates()
-            .sink { [weak self] value in
-                if !value {
-                    self?.dismiss()
-                }
-            }
-            .store(in: &cancellables)
+        cardController?.modalTransitionStyle = .crossDissolve
     }
     
     /// Presents a `SlideOverCard`
     @available(iOSApplicationExtension, unavailable)
     func present() {
-        if let cardController, !self.model.showCard {
+        
+        guard !self.model.showCard else { return }
+
+        if let cardController {
             var topViewController = window?.topViewController()
-            
-            // Fallback
-            if topViewController == nil {
+
+            if let topViewController {
+                if topViewController.presentedViewController == nil {
+                    topViewController.present(cardController, animated: false) {
+                        self.model.showCard = true
+                    }
+                }
+            } else {
                 let windowScene = UIApplication.shared
                     .connectedScenes
-                    .filter { $0.activationState == .foregroundActive }
                     .compactMap { $0 as? UIWindowScene }
-                    .first
+                    .first(where: { $0.activationState == .foregroundActive })
                 
                 topViewController = windowScene?
                     .windows
-                    .filter { $0.isKeyWindow }
-                    .first?
+                    .first(where: { $0.isKeyWindow })?
                     .rootViewController
-            }
-            
-            if let topViewController {
-                topViewController.present(cardController, animated: false) {
-                    self.model.showCard = true
-                }
             }
         }
     }
@@ -81,9 +73,8 @@ internal class SOCManager<Content: View, Style: ShapeStyle>: ObservableObject {
     @available(iOSApplicationExtension, unavailable)
     func dismiss() {
         onDismiss?()
-        self.model.showCard = false
-        DispatchQueue.main.asyncAfter(deadline: .now()+0.5) { [weak self] in
-            self?.cardController?.dismiss(animated: false)
+        cardController?.dismiss(animated: true) {
+            self.model.showCard = false
         }
     }
     
